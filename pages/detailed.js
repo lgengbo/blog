@@ -1,6 +1,7 @@
 import React from 'react'
 import Head from 'next/head'
 import { Row, Col, Icon, Breadcrumb ,Affix} from 'antd'
+import axios from 'axios'
 import Header from '../components/Header'
 import Author from '../components/Author'
 import Advert from '../components/Advert'
@@ -9,8 +10,15 @@ import '../public/style/pages/detailed.css'
 import ReactMarkDown from 'react-markdown'
 import MarkNav from 'markdown-navbar'
 import 'markdown-navbar/dist/navbar.css';
+import marked from 'marked'
+import hljs from 'highlight.js'
+import 'highlight.js/styles/monokai-sublime.css';
 
-const Detailed = () => {
+import Tocify from '../components/tocify.tsx'
+
+import ServicePath from '../config/apiUrl'
+
+const Detailed = (props) => {
   let markdown='# P01:课程介绍和环境搭建\n' +
   '[ **M** ] arkdown + E [ **ditor** ] = **Mditor**  \n' +
   '> Mditor 是一个简洁、易于集成、方便扩展、期望舒服的编写 markdown 的编辑器，仅此而已... \n\n' +
@@ -45,6 +53,26 @@ const Detailed = () => {
   '>> bbbbbbbbb\n' +
   '>>> cccccccccc\n\n'+
   '``` var a=11; ```'
+  const tocify = new Tocify(); // 初始化插件
+  const renderer = new marked.Renderer();
+  renderer.heading = function (text,level,raw) {
+    const anchor = tocify.add(text,level);
+    return `<a id="${anchor}" href="#${anchor}" class="anchor-fix"><h${level}>${text}</h${level}></a>\n`;
+    };
+  marked.setOptions({
+      renderer: renderer, // 你可以通过自定义的Renderer渲染出自定义的格式
+      gfm: true, // 启动类似Github样式的Markdown
+      pedantic: false, // 只解析符合Markdown定义的，不修正Markdown的错误
+      sanitize: false, // 原始输出，忽略HTML标签
+      tables: true, // 支持Github形式的表格
+      breaks: false, // 支持Github换行符
+      smartLists: true, // ：优化列表输出，这个填写ture之后，你的样式会好看很多
+      smartypants: false,
+      highlight: function (code) {
+        return hljs.highlightAuto(code).value; // 自动检测代码是html还是js等
+      }
+    });
+    let html = marked(props.article_content);
   return (
     <div>
       <Head>
@@ -62,18 +90,20 @@ const Detailed = () => {
           </div>
           <div>
             <div className="detailed-title">
-              专注前端开发技术
+            {props.title}
           </div>
             <div className="list-icon center">
-              <span><Icon type="calendar" />2019-12-22</span>
-              <span><Icon type="folder" />视频教程</span>
-              <span><Icon type="fire" />2020人</span>
+              <span><Icon type="calendar" />{props.addTime}</span>
+              <span><Icon type="folder" />{props.typeName}</span>
+              <span><Icon type="fire" />{props.view_count}</span>
             </div>
-            <div className="detail-content">
-              <ReactMarkDown
+            <div className="detailed-content"
+            dangerouslySetInnerHTML={{__html:html}} // 解析html标签
+            >
+              {/* <ReactMarkDown
                 source={markdown}
                 escapeHtml={false} // 不解析html标签
-              />
+              /> */}
           </div>
           </div>
         </Col>
@@ -84,11 +114,12 @@ const Detailed = () => {
           <Affix offsetTop={5}> 
           <div className="detailed-nav comm-box">
             <div className="nav-title">文章目录</div>
-            <MarkNav
+            {/* <MarkNav
               className="article-menu"
-              source={markdown}
+              source={html}
               ordered={false} // true是带编号
-          />
+          /> */}
+          {tocify && tocify.render()}
           </div>
           </Affix>
         </Col>
@@ -96,6 +127,17 @@ const Detailed = () => {
       <Footer />
     </div>
   )
+}
+
+// context获取Link路由传过来的值
+Detailed.getInitialProps = async (context) =>{
+  const id = context.query.id;
+  const promise = new Promise((resolve)=>{
+    axios(ServicePath.getArticleDetails + id).then((res)=>{
+      resolve(res.data.data[0])
+    })
+  })
+  return await promise;
 }
 
 export default Detailed
